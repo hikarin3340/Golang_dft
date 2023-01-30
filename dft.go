@@ -1,13 +1,13 @@
 package main
 
 import (
-  "encoding/csv"
-  "log"
-  "os"
-  "fmt"
-  "math"
-  //"math/cmplx"
-  "strconv"
+	"encoding/csv"
+	"log"
+	"os"
+	"fmt"
+	"math"
+	"strconv"
+	"time"
 )
 
 func read_csv(read_file string ) []float64 {
@@ -36,37 +36,29 @@ func read_csv(read_file string ) []float64 {
 }
 
 func dft(y []float64) ([]string , []string ) {
-	yr := []float64{} //real part
-	yi := []float64{} //imag part
-	spt:= []string{} //sinpuku spectol
-	spt_f:= []float64{}
-	hz := []string{} //herutu
-	hz_f := []float64{}
-	li := len(y)
-	lf := float64(li)
-	ycos := 0.0
-	ysin := 0.0
+	hz := []string{} //hertx string
+	spt:= []string{} //amplitude string
+	ycos, ysin := 0.0, 0.0
+	dft_now := time.Now()
 	
-	for i:=0; i<li; i++ {
-		if i% 1000 == 0 {
-			fmt.Println(i)
+	for l:=0; l<len(y); l++ {
+		ycos, ysin = 0.0, 0.0
+		if l % 10000 == 0 {
+			fmt.Printf("%d周目 %fs\n", l,  time.Since(dft_now).Seconds())
+			dft_now = time.Now()
 		}
-		ycos = 0.0
-		ysin = 0.0
-		for k:=0; k<li; k++ {
-			omega := 2.0 * math.Pi * float64(i) * float64(k) / lf // kaitensi
-			ycos += y[k] * math.Cos(omega)
-			ysin += y[k] * math.Sin(omega)
-		}
-		yr = append(yr, ycos)
-		yi = append(yi, ysin)
-		hz_f = append(hz_f, float64(i) * 44100.0 / lf)
-		spt_f= append(spt_f, math.Sqrt(ycos*ycos + ysin*ysin))
-		hz = append(hz, strconv.FormatFloat(hz_f[i], 'f', -4, 64))
-		spt = append(spt, strconv.FormatFloat(spt_f[i], 'f', -4, 64))
 		
+		for k:=0; k<len(y); k++ {
+			tf := 2.0 * math.Pi * float64(l) * float64(k) / float64(len(y)) // twiddle factor
+			ycos += y[k] * math.Cos(tf) // real part
+			ysin += y[k] * math.Sin(tf) // imag part
+		}
+		hz_f := float64(l) * 44100.0 / float64(len(y)) // hz float
+		spt_f:= math.Sqrt(ycos*ycos + ysin*ysin) // spt float
+		
+		hz = append(hz, strconv.FormatFloat(hz_f, 'f', -4, 64)) // float to string hz
+		spt = append(spt, strconv.FormatFloat(spt_f, 'f', -4, 64)) // float to string spt
 	}
-
 	return hz, spt
 }
 
@@ -80,35 +72,32 @@ func out_csv (out_file string , out1 []string , out2 []string ) {
 	writer := csv.NewWriter(file2)
 	defer writer.Flush()
 	
-	for l:=0; l< len(out1); l++ {
-		writer.Write([]string{out1[l], out2[l]})
+	for i:=0; i< len(out1); i++ {
+		writer.Write([]string{out1[i], out2[i]})
 	}
 }
 
 func main() {
+	now := time.Now()
 	
 	if len(os.Args) != 2 {
 		fmt.Println("input > dft xxx.csv")
 		os.Exit(0)
 	}
+	open_file := os.Args[1]
+	output_file := "dft_" + open_file
 
-	var open_file string = os.Args[1]
-	var output_file string = "dft_" + open_file
-	
-	
-	x := []float64{}
-	
-	x = read_csv(open_file)
-	
-	//fmt.Println(x)
-	
-	out_hz := []string{}
-	out_spt:= []string{}
-	
-	out_hz , out_spt = dft(x)
+	fmt.Println("計測開始")
 
-	//fmt.Println(out_hz[88], out_spt[88])
-
+	x := read_csv(open_file)
+	
+	fmt.Printf("csv読み込み完了 %fs\n", time.Since(now).Seconds())
+	
+	out_hz , out_spt := dft(x)
+	
+	fmt.Printf("dft完了 %fs\n", time.Since(now).Seconds())
+	
 	out_csv(output_file, out_hz, out_spt)
-
+	
+	fmt.Printf("csv出力完了 %fs\n", time.Since(now).Seconds())
 }
